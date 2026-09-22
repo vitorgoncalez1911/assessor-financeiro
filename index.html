@@ -542,8 +542,9 @@ async function carregarPeriodos(escolher){
   sel.value = escolher && (escolher === "todos" || meses.includes(escolher)) ? escolher : meses[0];
   carregarMes(sel.value);
   const sp = $("painel-mes"), antes = sp.value;
-  sp.replaceChildren(...meses.map(m => el("option", { value:m }, Maiusc(nomeMes(m)))));
-  sp.value = escolher && meses.includes(escolher) ? escolher : (meses.includes(antes) ? antes : meses[0]);
+  sp.replaceChildren(el("option", { value:"todos" }, "Consolidado (todos os meses)"),
+    ...meses.map(m => el("option", { value:m }, Maiusc(nomeMes(m)))));
+  sp.value = escolher && (escolher === "todos" || meses.includes(escolher)) ? escolher : ((antes === "todos" || meses.includes(antes)) ? antes : meses[0]);
   carregarPainel(sp.value);
 }
 $("mes").addEventListener("change", e => carregarMes(e.target.value));
@@ -825,8 +826,12 @@ $("painel-mes").addEventListener("change", e => carregarPainel(e.target.value));
 const MES_CURTO = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 
 async function carregarPainel(mes){
-  if (!mes) return;
-  const ini6 = addMes(mes, -5), fim = addMes(mes, 1);
+  if (!mes || !meses.length) return;
+  const tudo = mes === "todos";
+  const ultimo = meses[0], primeiro = meses[meses.length - 1];
+  const ref = tudo ? ultimo : mes;
+  const fim = addMes(ref, 1);
+  const ini6 = tudo ? (primeiro < addMes(ref, -5) ? primeiro : addMes(ref, -5)) : addMes(ref, -5);
   const hoje = new Date().toISOString().slice(0,10);
   const em30 = new Date(Date.now() + 30*864e5).toISOString().slice(0,10);
   const [hist, prox, fila] = await Promise.all([
@@ -837,22 +842,23 @@ async function carregarPainel(mes){
   const erro = hist.error || prox.error || fila.error;
   if (erro) return avisar("Não foi possível carregar o painel: " + erro.message);
 
-  const doMes = hist.data.filter(r => r.data_caixa >= mes && r.data_caixa < fim);
+  const doMes = tudo ? hist.data : hist.data.filter(r => r.data_caixa >= mes && r.data_caixa < fim);
+  const nMeses = tudo ? meses.length : 1;
   const soma = (rows, f = () => true) => rows.filter(f).reduce((a, r) => a + Number(r.valor), 0);
   const desp = soma(doMes, r => r.tipo_fluxo === "despesa"), rec = soma(doMes, r => r.tipo_fluxo === "receita");
   const saldo = rec - desp, taxa = rec ? (rec - desp) / rec : null;
 
-  $("painel-titulo").textContent = `Painel · ${MES_CURTO[+mes.slice(5,7)-1]}/${mes.slice(0,4)}`;
+  $("painel-titulo").textContent = tudo ? "Painel · consolidado" : `Painel · ${MES_CURTO[+mes.slice(5,7)-1]}/${mes.slice(0,4)}`;
   $("painel-status").replaceChildren(fila.data.length ? el("span", { class:"pilula atencao" }, `${fila.data.length} a revisar`) : el("span", { class:"pilula ok" }, "Em dia"));
   const kpi = (r, v, cls, n) => el("div", {}, el("div", { class:"rotulo sub", style:"margin:0" }, r), el("div", { class:"valor " + (cls || "") }, v), n ? el("div", { class:"nota sub", style:"margin:0;font-size:12px" }, n) : null);
   $("painel-kpis").replaceChildren(
-    kpi("Receitas", rec ? brl0.format(rec) : "—", "pos", rec ? null : "lance na aba Lançar"),
-    kpi("Despesas", brl0.format(desp)),
-    kpi("Saldo do mês", rec ? brl0.format(saldo) : "—", saldo >= 0 ? "pos" : "neg"),
+    kpi("Receitas", rec ? brl0.format(rec) : "—", "pos", rec ? (tudo ? `${brl0.format(rec/nMeses)} por mês` : null) : "lance na aba Lançar"),
+    kpi("Despesas", brl0.format(desp), "", tudo ? `${brl0.format(desp/nMeses)} por mês em ${nMeses} ${nMeses === 1 ? "mês" : "meses"}` : null),
+    kpi(tudo ? "Saldo do período" : "Saldo do mês", rec ? brl0.format(saldo) : "—", saldo >= 0 ? "pos" : "neg"),
     kpi("Taxa de poupança", taxa == null ? "—" : `${Math.round(taxa*100)}%`, taxa != null && taxa < 0 ? "neg" : "", taxa == null ? "precisa das receitas" : null));
 
   // gráfico de 6 meses
-  const lista = [...Array(6)].map((_, i) => addMes(mes, i - 5));
+  const lista = [...Array(6)].map((_, i) => addMes(ref, i - 5));
   const serie = lista.map(m => { const f = addMes(m, 1); const rows = hist.data.filter(r => r.data_caixa >= m && r.data_caixa < f);
     return { m, rec: soma(rows, r => r.tipo_fluxo === "receita"), desp: soma(rows, r => r.tipo_fluxo === "despesa") }; });
   const max = Math.max(1, ...serie.flatMap(s => [s.rec, s.desp]));
@@ -875,13 +881,15 @@ async function carregarPainel(mes){
   // alertas
   const alertas = [];
   const juros = soma(doMes, r => r.tipo === "juros" || (r.tipo === "iof" && /rotativo/i.test(r.sub || "")) || r.sub === "Juros e rotativo");
-  if (juros > 0) alertas.push(["erro", `${brl.format(juros)} em juros, multa e encargos de atraso neste mês. Débito automático do valor total evita isso.`]);
+  if (juros > 0) alertas.push(["erro", `${brl.format(juros)} em juros, multa e encargos de atraso ${tudo ? "no período" : "neste mês"}. Débito automático do valor total evita isso.`]);
   if (rec && desp > rec) alertas.push(["erro", `Gastos passaram as receitas em ${brl0.format(desp - rec)}.`]);
-  if (!rec) alertas.push(["atencao", "Nenhuma receita lançada neste mês. Lance o salário na aba Lançar, como recorrência mensal."]);
+  if (!rec) alertas.push(["atencao", `Nenhuma receita lançada ${tudo ? "no período" : "neste mês"}. Lance o salário na aba Lançar, como recorrência mensal.`]);
   if (fila.data.length) alertas.push(["atencao", `${fila.data.length} ${fila.data.length === 1 ? "lançamento espera" : "lançamentos esperam"} categoria na Revisão.`]);
   const ass = soma(doMes, r => r.cat === "Assinaturas digitais");
-  if (ass) alertas.push(["info", `Assinaturas digitais: ${brl0.format(ass)} no mês, cerca de ${brl0.format(ass * 12)} por ano.`]);
-  if (!alertas.length) alertas.push(["ok", "Nada fora do padrão neste mês."]);
+  if (ass) alertas.push(["info", tudo
+    ? `Assinaturas digitais: ${brl0.format(ass)} no período, média de ${brl0.format(ass/nMeses)} por mês.`
+    : `Assinaturas digitais: ${brl0.format(ass)} no mês, cerca de ${brl0.format(ass * 12)} por ano.`]);
+  if (!alertas.length) alertas.push(["ok", tudo ? "Nada fora do padrão no período." : "Nada fora do padrão neste mês."]);
   $("painel-alertas").replaceChildren(...alertas.map(([c, t]) => el("li", { class:c }, t)));
 
   // maiores categorias
@@ -904,7 +912,9 @@ async function carregarPainel(mes){
     el("div", { class:"legenda", style:"justify-content:space-between" },
       el("span", {}, el("i", { style:"background:var(--azul)" }), `Fixo ${brl0.format(fixo)} (${pf}%)`),
       el("span", {}, el("i", { style:"background:var(--ambar)" }), `Variável ${brl0.format(variavel)}`)),
-    el("p", { class:"dica" }, "Fixo: recorrências, parcelas, anuidades e categorias de valor fixo. É o que o mês já começa devendo."));
+    el("p", { class:"dica" }, tudo
+      ? `Fixo: recorrências, parcelas, anuidades e categorias de valor fixo. Média de ${brl0.format(fixo/nMeses)} por mês.`
+      : "Fixo: recorrências, parcelas, anuidades e categorias de valor fixo. É o que o mês já começa devendo."));
 
   // próximos 30 dias
   $("painel-proximos").replaceChildren(...(prox.data.length ? prox.data.slice(0, 12).map(r =>
