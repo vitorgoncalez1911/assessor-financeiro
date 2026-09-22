@@ -156,6 +156,34 @@ details.sub>summary .linha-cat .valor{font-weight:500}
 .previa{margin:18px 0 0;padding:14px;border-radius:10px;background:var(--fundo)}
 .resultado{margin:18px 0 0;padding:14px;border-radius:10px;background:var(--verde-claro)}
 .login{max-width:420px;margin:12vh auto 0}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 20px}
+.kpis .valor{font-size:clamp(20px,3vw,26px);font-weight:600;font-variant-numeric:tabular-nums}
+@media (max-width: 620px){ .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.pos{color:var(--verde)} .neg{color:var(--erro)}
+.grafico{width:100%;height:auto;display:block}
+.grafico .rec{fill:var(--verde)} .grafico .desp{fill:var(--azul)} .grafico text{fill:var(--texto-2);font:11px var(--fonte)}
+.grafico .eixo{stroke:var(--linha)}
+.legenda{display:flex;gap:16px;font-size:13px;color:var(--texto-2);margin:4px 0 10px}
+.legenda i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.alertas{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.alertas li{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;font-size:14px}
+.alertas .erro{background:var(--erro-claro);color:var(--erro)} .alertas .atencao{background:var(--ambar-claro);color:var(--ambar)}
+.alertas .info{background:var(--azul-claro);color:var(--texto)} .alertas .ok{background:var(--verde-claro);color:var(--verde)}
+.divisao{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--fundo);margin:10px 0 6px}
+.divisao i{display:block;height:100%}
+.linha-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 16px}
+@media (max-width: 520px){ .linha-form{grid-template-columns:minmax(0,1fr)} }
+.registro{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--linha)}
+.registro:first-child{border-top:0}
+.registro .desc{flex:1;min-width:0}
+.registro .desc strong{display:block;font-weight:500;font-size:14px}
+.registro .desc span{font-size:12px;color:var(--texto-2)}
+.registro .v{font-variant-numeric:tabular-nums;white-space:nowrap}
+.mini-acoes{display:flex;gap:12px;font-size:13px}
+.edicao{display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding:0 0 10px 36px}
+.edicao input{width:auto;min-width:120px}
+.so-celular{display:none}
+@media (max-width: 760px){ .so-celular{display:inline} }
 @media (prefers-reduced-motion: reduce){ .item-rev.saindo,.linha-cat .nome::before{transition:none} }
 </style>
 </head>
@@ -176,8 +204,12 @@ details.sub>summary .linha-cat .valor{font-weight:500}
 <div class="casca" id="app" hidden>
   <nav class="trilho" role="tablist" aria-label="Seções">
     <div class="marca" aria-hidden="true">F</div>
-    <button role="tab" id="tab-mes" aria-controls="aba-mes" aria-selected="true">
+    <button role="tab" id="tab-painel" aria-controls="aba-painel" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Painel</button>
+    <button role="tab" id="tab-mes" aria-controls="aba-mes" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Gastos</button>
+    <button role="tab" id="tab-lancar" aria-controls="aba-lancar" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Lançar</button>
     <button role="tab" id="tab-revisao" aria-controls="aba-revisao" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/></svg>Revisão<span id="badge" class="selo-num" hidden></span></button>
     <button role="tab" id="tab-importar" aria-controls="aba-importar" aria-selected="false">
@@ -190,8 +222,37 @@ details.sub>summary .linha-cat .valor{font-weight:500}
     <div class="conteudo">
       <div id="aviso" class="aviso" role="alert" hidden></div>
 
+      <!-- PAINEL -->
+      <section id="aba-painel" role="tabpanel" aria-labelledby="tab-painel">
+        <div class="cabeca-pagina">
+          <h1 id="painel-titulo">Painel</h1><span id="painel-status"></span>
+          <div class="acoes-topo">
+            <button class="link so-celular" id="sair-cel" type="button">Sair</button>
+            <select id="painel-mes" class="seletor" aria-label="Mês do painel"></select>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:20px"><div class="kpis" id="painel-kpis"></div></div>
+        <div class="grade" style="margin-bottom:20px">
+          <div class="card">
+            <h2>Últimos 6 meses</h2>
+            <div class="legenda"><span><i style="background:var(--verde)"></i>Receitas</span><span><i style="background:var(--azul)"></i>Despesas</span></div>
+            <div id="painel-grafico"></div>
+          </div>
+          <div class="card"><h2>Atenção</h2><p class="sub">O que merece um olhar neste mês.</p><ul class="alertas" id="painel-alertas"></ul></div>
+        </div>
+        <div class="grade">
+          <div class="card">
+            <h2>Maiores categorias</h2>
+            <ul class="lista-simples" id="painel-cats"></ul>
+            <h2 style="margin-top:22px">Fixo e variável</h2>
+            <div id="painel-fixo"></div>
+          </div>
+          <div class="card"><h2>Próximos 30 dias</h2><p class="sub">Contas recorrentes e parcelas que vão cair.</p><ul class="lista-simples" id="painel-proximos"></ul></div>
+        </div>
+      </section>
+
       <!-- GASTOS -->
-      <section id="aba-mes" role="tabpanel" aria-labelledby="tab-mes">
+      <section id="aba-mes" role="tabpanel" aria-labelledby="tab-mes" hidden>
         <div class="cabeca-pagina">
           <h1 id="mes-titulo">…</h1><span id="mes-status"></span>
           <div class="acoes-topo">
@@ -230,6 +291,41 @@ details.sub>summary .linha-cat .valor{font-weight:500}
               <h2>Parcelas que já vêm</h2>
               <ul class="lista-simples" id="mes-futuras"></ul>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LANÇAR -->
+      <section id="aba-lancar" role="tabpanel" aria-labelledby="tab-lancar" hidden>
+        <div class="cabeca-pagina"><h1>Lançar</h1></div>
+        <p class="sub">Receitas, Pix, boletos, dinheiro. Se repetir, escolha a frequência e ele aparece sozinho nos próximos meses.</p>
+        <div class="grade">
+          <div class="card">
+            <div class="segmentos" role="group" aria-label="Tipo" id="lan-tipo"></div>
+            <label for="lan-desc">Descrição</label>
+            <input id="lan-desc" type="text" placeholder="Ex.: Escola das crianças, Salário, Feira">
+            <div class="linha-form">
+              <div><label for="lan-valor">Valor (R$)</label><input id="lan-valor" type="text" inputmode="decimal" placeholder="0,00"></div>
+              <div><label for="lan-data">Data</label><input id="lan-data" type="date"></div>
+            </div>
+            <label for="lan-busca">Categoria</label>
+            <div class="busca-cat" id="lan-cat"></div>
+            <div class="linha-form">
+              <div><label id="lan-quem-rot">Quem pagou</label><div class="segmentos" role="group" aria-labelledby="lan-quem-rot" id="lan-quem"></div></div>
+              <div id="lan-forma-box"><label for="lan-forma">Forma</label>
+                <select id="lan-forma"><option value="pix">Pix</option><option value="boleto">Boleto</option><option value="debito">Débito em conta</option><option value="dinheiro">Dinheiro</option><option value="transferencia">Transferência</option></select></div>
+            </div>
+            <div class="linha-form">
+              <div><label for="lan-rep">Repetir</label>
+                <select id="lan-rep"><option value="">Não repete</option><option value="mensal">Todo mês</option><option value="bimestral">A cada 2 meses</option><option value="trimestral">A cada 3 meses</option><option value="semestral">A cada 6 meses</option><option value="anual">Todo ano</option></select></div>
+              <div id="lan-fim-box" hidden><label for="lan-fim">Até (opcional)</label><input id="lan-fim" type="date"></div>
+            </div>
+            <div class="acoes"><button class="botao" id="lan-salvar" type="button">Salvar</button></div>
+            <div id="lan-ok" class="resultado" role="status" hidden></div>
+          </div>
+          <div class="coluna">
+            <div class="card"><h2>Recorrências</h2><p class="sub">O que se repete sozinho.</p><div id="lan-recorrencias"></div></div>
+            <div class="card"><h2>Lançados à mão</h2><p class="sub">Os mais recentes.</p><div id="lan-recentes"></div></div>
           </div>
         </div>
       </section>
@@ -353,10 +449,13 @@ function el(tag, props = {}, ...filhos){
 const ICONE_CARTAO = () => { const s = document.createElementNS("http://www.w3.org/2000/svg","svg"); s.setAttribute("viewBox","0 0 24 24"); s.setAttribute("fill","none"); s.setAttribute("stroke","currentColor"); s.setAttribute("stroke-width","1.8"); s.setAttribute("aria-hidden","true"); s.innerHTML = '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>'; return s; };
 function avisar(msg){ const a = $("aviso"); a.textContent = msg || ""; a.hidden = !msg; }
 
-let pessoas = [], contas = [], categorias = [], meses = [], filtroPessoa = "todos", iniciado = false;
+let pessoas = [], contas = [], categorias = [], categoriasRec = [], meses = [], filtroPessoa = "todos", iniciado = false, eu = null;
 const inicial = nome => nome ? nome.trim().charAt(0).toUpperCase() : "?";
 const classePessoa = nome => ({ V:"v", G:"g" }[inicial(nome)] || "x");
+const FORMAS = { pix:"Pix", boleto:"Boleto", debito:"Débito", dinheiro:"Dinheiro", transferencia:"Transferência", receita:"Receita" };
+const PERIODOS = { mensal:"todo mês", bimestral:"a cada 2 meses", trimestral:"a cada 3 meses", semestral:"a cada 6 meses", anual:"todo ano" };
 function rotuloCartao(r){
+  if (!r.conta_id) return (FORMAS[r.tipo] || "Manual") + (r.periodicidade ? ` · ↻ ${PERIODOS[r.periodicidade]}` : "");
   const conta = contas.find(c => c.id === r.conta_id);
   const base = conta && conta.instituicao && conta.instituicao !== "A confirmar" ? conta.instituicao : (conta ? conta.apelido : (r.conta || "Conta"));
   return r.final_cartao ? `${base} •${r.final_cartao}` : base;
@@ -385,31 +484,42 @@ $("form-login").addEventListener("submit", async e => {
     : `Link enviado para ${email}. Abra o e-mail neste mesmo aparelho.`;
 });
 $("sair").addEventListener("click", () => db.auth.signOut());
+$("sair-cel").addEventListener("click", () => db.auth.signOut());
 
 /* ---------- abas ---------- */
 function abrirAba(nome){
-  for (const a of ["mes","revisao","importar"]){
+  for (const a of ["painel","mes","lancar","revisao","importar"]){
     $("tab-"+a).setAttribute("aria-selected", a === nome);
     $("aba-"+a).hidden = a !== nome;
   }
   avisar(""); window.scrollTo(0, 0);
 }
-for (const a of ["mes","revisao","importar"]) $("tab-"+a).addEventListener("click", () => abrirAba(a));
+for (const a of ["painel","mes","lancar","revisao","importar"]) $("tab-"+a).addEventListener("click", () => abrirAba(a));
 
 async function carregarTudo(){
-  const [p, c, k] = await Promise.all([
-    db.from("pessoas").select("id,nome").order("nome"),
+  const m = await db.rpc("materializar_recorrencias");
+  if (m.error) avisar("Não foi possível atualizar as recorrências: " + m.error.message);
+  const { data:{ session } } = await db.auth.getSession();
+  const [p, c, k, kr] = await Promise.all([
+    db.from("pessoas").select("id,nome,user_id").order("nome"),
     db.from("contas").select("id,apelido,instituicao,tipo").eq("ativa", true).order("apelido"),
-    db.from("v_categorias_despesa").select("*").order("ordem_cat").order("ordem_sub")
+    db.from("v_categorias_despesa").select("*").order("ordem_cat").order("ordem_sub"),
+    db.from("categorias").select("id,nome,parent_id,tipo_fluxo,ordem,ativa")
   ]);
-  const erro = p.error || c.error || k.error;
+  const erro = p.error || c.error || k.error || kr.error;
   if (erro) return avisar("Não foi possível carregar os dados: " + erro.message);
   pessoas = p.data.sort((a, b) => a.nome === "Vitor" ? -1 : b.nome === "Vitor" ? 1 : a.nome.localeCompare(b.nome));
   contas = c.data; categorias = k.data;
+  eu = pessoas.find(x => session && x.user_id === session.user.id) || pessoas[0];
+  const paiRec = kr.data.find(x => x.parent_id == null && x.tipo_fluxo === "receita");
+  categoriasRec = kr.data.filter(x => paiRec && x.parent_id === paiRec.id && x.ativa).sort((a, b) => a.ordem - b.ordem)
+    .map(x => ({ id:x.id, categoria:"Receitas", subcategoria:x.nome }));
+  montarLancar();
   $("imp-conta").replaceChildren(...contas.filter(x => x.tipo === "cartao").map(x => el("option", { value:x.id }, x.apelido)));
   montarFiltroPessoa();
   await carregarPeriodos();
   carregarFila();
+  carregarLancados();
 }
 
 function montarFiltroPessoa(){
@@ -422,7 +532,8 @@ function montarFiltroPessoa(){
 async function carregarPeriodos(escolher){
   const { data, error } = await db.from("faturas").select("mes_referencia").order("mes_referencia", { ascending:false });
   if (error) return avisar("Não foi possível carregar os meses: " + error.message);
-  meses = [...new Set(data.map(d => d.mes_referencia))];
+  const man = await db.from("v_lancamentos").select("data_caixa").eq("origem", "manual").eq("previsto", false).limit(10000);
+  meses = [...new Set([...data.map(d => d.mes_referencia), ...(man.data || []).map(d => d.data_caixa.slice(0,7) + "-01")])].sort().reverse();
   const sel = $("mes");
   if (!meses.length){ $("mes-titulo").textContent = "Sem dados"; $("mes-total").textContent = "—"; return; }
   sel.replaceChildren(
@@ -430,6 +541,10 @@ async function carregarPeriodos(escolher){
     ...meses.map(m => el("option", { value:m }, Maiusc(nomeMes(m)))));
   sel.value = escolher && (escolher === "todos" || meses.includes(escolher)) ? escolher : meses[0];
   carregarMes(sel.value);
+  const sp = $("painel-mes"), antes = sp.value;
+  sp.replaceChildren(...meses.map(m => el("option", { value:m }, Maiusc(nomeMes(m)))));
+  sp.value = escolher && meses.includes(escolher) ? escolher : (meses.includes(antes) ? antes : meses[0]);
+  carregarPainel(sp.value);
 }
 $("mes").addEventListener("change", e => carregarMes(e.target.value));
 
@@ -569,13 +684,13 @@ async function carregarFila(){
   $("lista").replaceChildren(...data.map(cartaoRevisao));
 }
 
-function seletorComBusca(sugestao, i){
+function seletorComBusca(sugestao, i, fonte = categorias){
   const busca = el("input", { type:"search", id:"busca-" + i, placeholder:"Buscar categoria: farmácia, cavalo, restaurante…", autocomplete:"off" });
   const sel = el("select", { id:"cat-" + i, "aria-label":"Categoria" });
   function montar(){
     const termo = semAcento(busca.value.trim());
     const atual = sel.value || (sugestao ? String(sugestao) : "");
-    const lista = categorias.filter(c => !termo || semAcento(c.categoria + " " + c.subcategoria).includes(termo));
+    const lista = fonte.filter(c => !termo || semAcento(c.categoria + " " + c.subcategoria).includes(termo));
     sel.replaceChildren(el("option", { value:"" }, lista.length ? (termo ? `${lista.length} encontrada(s)` : "Escolha a categoria") : "Nada encontrado"));
     let grupo = null, nome = null;
     for (const c of lista){
@@ -636,7 +751,7 @@ async function resolver(card, botoes, args){
   const { error } = await db.rpc("resolver_revisao", { p_revisao: card.dataset.id, ...args });
   if (error){ botoes.forEach(b => b.disabled = false); return avisar("Não salvou: " + error.message); }
   card.classList.add("saindo");
-  setTimeout(() => { carregarFila(); carregarMes($("mes").value); }, 260);
+  setTimeout(() => { carregarFila(); carregarMes($("mes").value); carregarPainel($("painel-mes").value); }, 260);
 }
 
 /* ---------- Importar ---------- */
@@ -704,6 +819,218 @@ $("imp-ir").addEventListener("click", async () => {
   await carregarPeriodos(venc.slice(0,7) + "-01");
   carregarFila();
 });
+
+/* ---------- Painel ---------- */
+$("painel-mes").addEventListener("change", e => carregarPainel(e.target.value));
+const MES_CURTO = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+
+async function carregarPainel(mes){
+  if (!mes) return;
+  const ini6 = addMes(mes, -5), fim = addMes(mes, 1);
+  const hoje = new Date().toISOString().slice(0,10);
+  const em30 = new Date(Date.now() + 30*864e5).toISOString().slice(0,10);
+  const [hist, prox, fila] = await Promise.all([
+    db.from("v_lancamentos").select("valor,data_caixa,tipo_fluxo,cat,sub,tipo,recorrencia_id,parcela_de,previsibilidade").eq("previsto", false).gte("data_caixa", ini6).lt("data_caixa", fim).limit(20000),
+    db.from("v_lancamentos").select("id,nome,valor,data_caixa,tipo_fluxo,pessoa,pessoa_id,parcela_num,parcela_de,conta_id,final_cartao,conta,tipo,periodicidade,instituicao").eq("previsto", true).gte("data_caixa", hoje).lte("data_caixa", em30).order("data_caixa").limit(500),
+    db.from("v_fila_revisao").select("revisao_id")
+  ]);
+  const erro = hist.error || prox.error || fila.error;
+  if (erro) return avisar("Não foi possível carregar o painel: " + erro.message);
+
+  const doMes = hist.data.filter(r => r.data_caixa >= mes && r.data_caixa < fim);
+  const soma = (rows, f = () => true) => rows.filter(f).reduce((a, r) => a + Number(r.valor), 0);
+  const desp = soma(doMes, r => r.tipo_fluxo === "despesa"), rec = soma(doMes, r => r.tipo_fluxo === "receita");
+  const saldo = rec - desp, taxa = rec ? (rec - desp) / rec : null;
+
+  $("painel-titulo").textContent = `Painel · ${MES_CURTO[+mes.slice(5,7)-1]}/${mes.slice(0,4)}`;
+  $("painel-status").replaceChildren(fila.data.length ? el("span", { class:"pilula atencao" }, `${fila.data.length} a revisar`) : el("span", { class:"pilula ok" }, "Em dia"));
+  const kpi = (r, v, cls, n) => el("div", {}, el("div", { class:"rotulo sub", style:"margin:0" }, r), el("div", { class:"valor " + (cls || "") }, v), n ? el("div", { class:"nota sub", style:"margin:0;font-size:12px" }, n) : null);
+  $("painel-kpis").replaceChildren(
+    kpi("Receitas", rec ? brl0.format(rec) : "—", "pos", rec ? null : "lance na aba Lançar"),
+    kpi("Despesas", brl0.format(desp)),
+    kpi("Saldo do mês", rec ? brl0.format(saldo) : "—", saldo >= 0 ? "pos" : "neg"),
+    kpi("Taxa de poupança", taxa == null ? "—" : `${Math.round(taxa*100)}%`, taxa != null && taxa < 0 ? "neg" : "", taxa == null ? "precisa das receitas" : null));
+
+  // gráfico de 6 meses
+  const lista = [...Array(6)].map((_, i) => addMes(mes, i - 5));
+  const serie = lista.map(m => { const f = addMes(m, 1); const rows = hist.data.filter(r => r.data_caixa >= m && r.data_caixa < f);
+    return { m, rec: soma(rows, r => r.tipo_fluxo === "receita"), desp: soma(rows, r => r.tipo_fluxo === "despesa") }; });
+  const max = Math.max(1, ...serie.flatMap(s => [s.rec, s.desp]));
+  const W = 600, H = 220, base = 190, alt = 170, larg = W / 6;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg"); svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("class", "grafico"); svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Receitas e despesas dos últimos 6 meses: " + serie.map(s => `${MES_CURTO[+s.m.slice(5,7)-1]} receitas ${brl0.format(s.rec)}, despesas ${brl0.format(s.desp)}`).join("; "));
+  const add = (tag, attrs, txt) => { const n = document.createElementNS(ns, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); if (txt != null) n.textContent = txt; svg.append(n); return n; };
+  add("line", { x1:0, x2:W, y1:base, y2:base, class:"eixo" });
+  serie.forEach((s, i) => {
+    const x = i * larg + larg * 0.2, bw = larg * 0.28;
+    const hr = s.rec / max * alt, hd = s.desp / max * alt;
+    const b1 = add("rect", { x, y: base - hr, width: bw, height: Math.max(hr, s.rec ? 1 : 0), rx: 3, class:"rec" }); b1.appendChild(Object.assign(document.createElementNS(ns, "title"), { textContent:`Receitas ${brl0.format(s.rec)}` }));
+    const b2 = add("rect", { x: x + bw + 4, y: base - hd, width: bw, height: Math.max(hd, s.desp ? 1 : 0), rx: 3, class:"desp" }); b2.appendChild(Object.assign(document.createElementNS(ns, "title"), { textContent:`Despesas ${brl0.format(s.desp)}` }));
+    add("text", { x: x + bw + 2, y: base + 18, "text-anchor":"middle" }, `${MES_CURTO[+s.m.slice(5,7)-1]}/${s.m.slice(2,4)}`);
+    if (s.desp) add("text", { x: x + bw * 1.5 + 4, y: base - hd - 5, "text-anchor":"middle" }, `${(s.desp/1000).toFixed(1).replace(".", ",")}k`);
+  });
+  $("painel-grafico").replaceChildren(svg);
+
+  // alertas
+  const alertas = [];
+  const juros = soma(doMes, r => r.tipo === "juros" || (r.tipo === "iof" && /rotativo/i.test(r.sub || "")) || r.sub === "Juros e rotativo");
+  if (juros > 0) alertas.push(["erro", `${brl.format(juros)} em juros, multa e encargos de atraso neste mês. Débito automático do valor total evita isso.`]);
+  if (rec && desp > rec) alertas.push(["erro", `Gastos passaram as receitas em ${brl0.format(desp - rec)}.`]);
+  if (!rec) alertas.push(["atencao", "Nenhuma receita lançada neste mês. Lance o salário na aba Lançar, como recorrência mensal."]);
+  if (fila.data.length) alertas.push(["atencao", `${fila.data.length} ${fila.data.length === 1 ? "lançamento espera" : "lançamentos esperam"} categoria na Revisão.`]);
+  const ass = soma(doMes, r => r.cat === "Assinaturas digitais");
+  if (ass) alertas.push(["info", `Assinaturas digitais: ${brl0.format(ass)} no mês, cerca de ${brl0.format(ass * 12)} por ano.`]);
+  if (!alertas.length) alertas.push(["ok", "Nada fora do padrão neste mês."]);
+  $("painel-alertas").replaceChildren(...alertas.map(([c, t]) => el("li", { class:c }, t)));
+
+  // maiores categorias
+  const porCat = new Map();
+  for (const r of doMes.filter(r => r.tipo_fluxo === "despesa")){ const k = r.cat || "A classificar"; porCat.set(k, (porCat.get(k) || 0) + Number(r.valor)); }
+  const top = [...porCat.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const maiorCat = top.length ? top[0][1] : 1;
+  $("painel-cats").replaceChildren(...(top.length ? top.map(([k, v]) => el("li", {},
+      el("span", { style:"min-width:0;flex:0 1 40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, k),
+      el("span", { class:"mini-barra", "aria-hidden":"true" }, el("i", { style:`width:${Math.round(v/maiorCat*100)}%;background:var(--verde)` })),
+      el("span", { style:"min-width:96px;text-align:right" }, brl0.format(v), el("span", { class:"linha-cat", style:"justify-content:flex-end" }, el("span", { class:"pct" }, desp ? `${Math.round(v/desp*100)}%` : "")))))
+    : [el("li", {}, el("span", { class:"sub", style:"margin:0" }, "Nenhuma despesa"), el("span", {}))]));
+
+  // fixo x variável
+  const ehFixo = r => r.recorrencia_id || r.parcela_de || r.previsibilidade === "fixo" || r.tipo === "anuidade";
+  const fixo = soma(doMes, r => r.tipo_fluxo === "despesa" && ehFixo(r)), variavel = desp - fixo;
+  const pf = desp ? Math.round(fixo / desp * 100) : 0;
+  $("painel-fixo").replaceChildren(
+    el("div", { class:"divisao", "aria-hidden":"true" }, el("i", { style:`width:${pf}%;background:var(--azul)` }), el("i", { style:`width:${100-pf}%;background:var(--ambar)` })),
+    el("div", { class:"legenda", style:"justify-content:space-between" },
+      el("span", {}, el("i", { style:"background:var(--azul)" }), `Fixo ${brl0.format(fixo)} (${pf}%)`),
+      el("span", {}, el("i", { style:"background:var(--ambar)" }), `Variável ${brl0.format(variavel)}`)),
+    el("p", { class:"dica" }, "Fixo: recorrências, parcelas, anuidades e categorias de valor fixo. É o que o mês já começa devendo."));
+
+  // próximos 30 dias
+  $("painel-proximos").replaceChildren(...(prox.data.length ? prox.data.slice(0, 12).map(r =>
+      el("li", {}, el("span", { style:"display:flex;gap:10px;align-items:center;min-width:0" },
+          el("span", { class:`quem ${classePessoa(r.pessoa)}`, style:"cursor:default", "aria-hidden":"true" }, inicial(r.pessoa)),
+          el("span", { style:"min-width:0" }, el("span", { style:"display:block;font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, r.nome),
+            el("span", { style:"font-size:12px;color:var(--texto-2)" }, `${dataBR(r.data_caixa)} · ${rotuloCartao(r)}${r.parcela_de ? ` · ${r.parcela_num}/${r.parcela_de}` : ""}`))),
+        el("span", { class: r.tipo_fluxo === "receita" ? "pos" : "" }, (r.tipo_fluxo === "receita" ? "+ " : "") + brl.format(r.valor))))
+    : [el("li", {}, el("span", { class:"sub", style:"margin:0" }, "Nada previsto para os próximos 30 dias"), el("span", {}))]));
+}
+
+/* ---------- Lançar ---------- */
+let lanTipo = "despesa", lanQuem = null, lanSel = null;
+function lerValor(s){ s = (s || "").replace(/R\$/g, "").replace(/\s/g, ""); if (s.includes(",")) s = s.replace(/\./g, "").replace(",", "."); const n = Number(s); return isFinite(n) ? n : NaN; }
+function montarLancar(){
+  lanQuem = lanQuem || (eu && eu.id);
+  $("lan-tipo").replaceChildren(...[["despesa","Despesa"],["receita","Receita"]].map(([v, t]) =>
+    el("button", { type:"button", "aria-pressed": String(lanTipo === v), onclick:() => { lanTipo = v; montarLancar(); } }, t)));
+  $("lan-quem-rot").textContent = lanTipo === "receita" ? "Quem recebeu" : "Quem pagou";
+  $("lan-quem").replaceChildren(...pessoas.map(p =>
+    el("button", { type:"button", "aria-pressed": String(lanQuem === p.id), onclick:() => { lanQuem = p.id; montarLancar(); } }, p.nome)));
+  $("lan-forma-box").hidden = lanTipo === "receita";
+  const { busca, sel } = seletorComBusca(null, "lan", lanTipo === "receita" ? categoriasRec : categorias);
+  busca.id = "lan-busca"; lanSel = sel;
+  $("lan-cat").replaceChildren(busca, sel);
+  if (!$("lan-data").value) $("lan-data").value = new Date().toISOString().slice(0,10);
+}
+$("lan-rep").addEventListener("change", e => { $("lan-fim-box").hidden = !e.target.value; });
+$("lan-salvar").addEventListener("click", async () => {
+  avisar(""); $("lan-ok").hidden = true;
+  const valor = lerValor($("lan-valor").value), desc = $("lan-desc").value.trim(), data = $("lan-data").value, cat = Number(lanSel && lanSel.value);
+  if (!desc){ $("lan-desc").focus(); return avisar("Informe uma descrição."); }
+  if (!(valor > 0)){ $("lan-valor").focus(); return avisar("Informe um valor maior que zero. Ex.: 1.250,00"); }
+  if (!data){ $("lan-data").focus(); return avisar("Informe a data."); }
+  if (!cat){ $("lan-busca").focus(); return avisar("Escolha uma categoria."); }
+  const rep = $("lan-rep").value || null;
+  $("lan-salvar").disabled = true;
+  const { error } = await db.rpc("lancar_manual", { p_tipo: lanTipo === "receita" ? null : $("lan-forma").value, p_descricao: desc, p_valor: valor,
+    p_data: data, p_categoria: cat, p_pessoa: lanQuem, p_periodicidade: rep, p_fim: rep && $("lan-fim").value ? $("lan-fim").value : null });
+  $("lan-salvar").disabled = false;
+  if (error) return avisar("Não salvou: " + error.message);
+  $("lan-ok").replaceChildren(el("strong", {}, "Lançado"), el("div", { class:"sub", style:"margin:4px 0 0" },
+    `${desc}, ${brl.format(valor)}${rep ? `, ${PERIODOS[rep]} a partir de ${dataBR(data)}` : ""}.`));
+  $("lan-ok").hidden = false;
+  $("lan-desc").value = ""; $("lan-valor").value = ""; $("lan-rep").value = ""; $("lan-fim").value = ""; $("lan-fim-box").hidden = true;
+  montarLancar();
+  await carregarPeriodos($("mes").value);
+  carregarLancados();
+});
+
+async function carregarLancados(){
+  const [rc, oc, rec] = await Promise.all([
+    db.from("recorrencias").select("id,descricao,valor_estimado,periodicidade,dia_do_mes,tipo_fluxo,pessoa_id").eq("ativa", true).order("descricao"),
+    db.from("v_lancamentos").select("id,recorrencia_id,data_caixa,valor").eq("previsto", true).not("recorrencia_id", "is", null).order("data_caixa").limit(2000),
+    db.from("v_lancamentos").select("id,nome,valor,data_caixa,tipo,tipo_fluxo,pessoa,pessoa_id,recorrencia_id,periodicidade,conta_id").eq("origem", "manual").eq("previsto", false).order("data_caixa", { ascending:false }).limit(20)
+  ]);
+  const erro = rc.error || oc.error || rec.error;
+  if (erro) return avisar("Não foi possível carregar os lançamentos: " + erro.message);
+  const proxima = new Map();
+  for (const o of oc.data) if (!proxima.has(o.recorrencia_id)) proxima.set(o.recorrencia_id, o);
+
+  $("lan-recorrencias").replaceChildren(...(rc.data.length ? rc.data.map(r => {
+    const p = pessoas.find(x => x.id === r.pessoa_id), prox = proxima.get(r.id);
+    const linha = el("div", { class:"registro" },
+      el("span", { class:`quem ${classePessoa(p && p.nome)}`, style:"cursor:default", "aria-hidden":"true" }, inicial(p && p.nome)),
+      el("div", { class:"desc" }, el("strong", {}, r.descricao),
+        el("span", {}, `${PERIODOS[r.periodicidade]}, dia ${r.dia_do_mes}${prox ? ` · próxima ${dataBR(prox.data_caixa)}` : ""}`)),
+      el("span", { class:"v " + (r.tipo_fluxo === "receita" ? "pos" : "") }, brl.format(r.valor_estimado)));
+    const caixa = el("div", {}, linha);
+    if (prox){
+      const edit = el("button", { class:"link", type:"button" }, "Alterar valor");
+      const fim = el("button", { class:"link", type:"button", style:"color:var(--erro)" }, "Encerrar");
+      edit.onclick = () => {
+        const inp = el("input", { type:"text", inputmode:"decimal", value: String(r.valor_estimado).replace(".", ","), "aria-label":"Novo valor" });
+        const ok = el("button", { class:"botao", type:"button" }, `Salvar a partir de ${dataBR(prox.data_caixa)}`);
+        ok.onclick = async () => {
+          const v = lerValor(inp.value); if (!(v > 0)) return avisar("Valor inválido.");
+          const { error } = await db.rpc("editar_lancamento", { p_id: prox.id, p_valor: v, p_data: prox.data_caixa, p_descricao: null, p_categoria: null, p_daqui_pra_frente: true });
+          if (error) return avisar("Não salvou: " + error.message);
+          carregarLancados(); carregarPainel($("painel-mes").value);
+        };
+        caixa.append(el("div", { class:"edicao" }, inp, ok));
+        edit.remove();
+      };
+      fim.onclick = async () => {
+        if (!confirm(`Encerrar "${r.descricao}"? As ocorrências a partir de ${dataBR(prox.data_caixa)} deixam de existir. As passadas ficam.`)) return;
+        const { error } = await db.rpc("excluir_lancamento", { p_id: prox.id, p_encerrar: true });
+        if (error) return avisar("Não encerrou: " + error.message);
+        carregarLancados(); carregarPainel($("painel-mes").value);
+      };
+      caixa.append(el("div", { class:"mini-acoes", style:"padding:0 0 10px 36px" }, edit, fim));
+    }
+    return caixa;
+  }) : [el("p", { class:"sub" }, "Nenhuma ainda. Salário, escola, aluguel e plano de saúde são bons candidatos.")]));
+
+  $("lan-recentes").replaceChildren(...(rec.data.length ? rec.data.map(r => {
+    const caixa = el("div", {});
+    const edit = el("button", { class:"link", type:"button" }, "Editar");
+    const del = el("button", { class:"link", type:"button", style:"color:var(--erro)" }, r.recorrencia_id ? "Excluir este mês" : "Excluir");
+    edit.onclick = () => {
+      const v = el("input", { type:"text", inputmode:"decimal", value: String(r.valor).replace(".", ","), "aria-label":"Valor" });
+      const d = el("input", { type:"date", value: r.data_caixa, "aria-label":"Data" });
+      const ok = el("button", { class:"botao", type:"button" }, "Salvar");
+      ok.onclick = async () => {
+        const n = lerValor(v.value); if (!(n > 0)) return avisar("Valor inválido.");
+        const { error } = await db.rpc("editar_lancamento", { p_id: r.id, p_valor: n, p_data: d.value, p_descricao: null, p_categoria: null, p_daqui_pra_frente: false });
+        if (error) return avisar("Não salvou: " + error.message);
+        await carregarPeriodos($("mes").value); carregarLancados();
+      };
+      caixa.append(el("div", { class:"edicao" }, v, d, ok)); edit.remove();
+    };
+    del.onclick = async () => {
+      if (!confirm(r.recorrencia_id ? `Excluir "${r.nome}" só de ${dataBR(r.data_caixa)}? A recorrência continua nos outros meses.` : `Excluir "${r.nome}"?`)) return;
+      const { error } = await db.rpc("excluir_lancamento", { p_id: r.id, p_encerrar: false });
+      if (error) return avisar("Não excluiu: " + error.message);
+      await carregarPeriodos($("mes").value); carregarLancados();
+    };
+    caixa.append(
+      el("div", { class:"registro" },
+        el("span", { class:`quem ${classePessoa(r.pessoa)}`, style:"cursor:default", "aria-hidden":"true" }, inicial(r.pessoa)),
+        el("div", { class:"desc" }, el("strong", {}, r.nome), el("span", {}, `${dataBR(r.data_caixa)} · ${rotuloCartao(r)}`)),
+        el("span", { class:"v " + (r.tipo_fluxo === "receita" ? "pos" : "") }, (r.tipo_fluxo === "receita" ? "+ " : "") + brl.format(r.valor))),
+      el("div", { class:"mini-acoes", style:"padding:0 0 10px 36px" }, edit, del));
+    return caixa;
+  }) : [el("p", { class:"sub" }, "Nada lançado à mão ainda.")]));
+}
 
 iniciar();
 </script>
