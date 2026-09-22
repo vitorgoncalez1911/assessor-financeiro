@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Revisão de lançamentos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Mono:wght@500&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --papel:#EEF1EC; --superficie:#FFFFFF; --tinta:#1F2A2E; --tinta-2:#56646A;
+  --linha:#C9D1CB; --musgo:#3F6B55; --musgo-claro:#DCE8E0; --ambar:#9A6414; --ambar-claro:#F5E6CC;
+  --erro:#A33A2A;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --texto:"Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --maquina:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --papel:#151B1D; --superficie:#1E2629; --tinta:#E3E8E4; --tinta-2:#9AA8A2;
+    --linha:#33403F; --musgo:#7FB79A; --musgo-claro:#23372D; --ambar:#E0A94A; --ambar-claro:#3A2E18; --erro:#E5836F;
+  }
+}
+:root[data-theme="dark"]{
+  --papel:#151B1D; --superficie:#1E2629; --tinta:#E3E8E4; --tinta-2:#9AA8A2;
+  --linha:#33403F; --musgo:#7FB79A; --musgo-claro:#23372D; --ambar:#E0A94A; --ambar-claro:#3A2E18; --erro:#E5836F;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--papel);color:var(--tinta);font:400 17px/1.5 var(--texto);-webkit-text-size-adjust:100%}
+main{max-width:560px;margin:0 auto;padding:28px 18px 64px}
+h1{font:700 clamp(40px,11vw,64px)/1 var(--display);letter-spacing:-.02em;margin:0 0 6px;font-variant-numeric:tabular-nums}
+.sub{color:var(--tinta-2);margin:0 0 28px}
+.topo{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:18px;color:var(--tinta-2);font-size:15px}
+button,input,select{font:inherit;color:inherit}
+.botao{appearance:none;border:0;border-radius:10px;padding:12px 18px;font-weight:600;cursor:pointer;background:var(--musgo);color:var(--superficie)}
+.botao.secundario{background:transparent;color:var(--tinta);box-shadow:inset 0 0 0 1.5px var(--linha)}
+.botao.perigo{background:transparent;color:var(--erro);box-shadow:inset 0 0 0 1.5px currentColor}
+.botao:disabled{opacity:.5;cursor:default}
+.link{background:none;border:0;padding:0;color:var(--tinta-2);text-decoration:underline;cursor:pointer}
+:focus-visible{outline:3px solid var(--musgo);outline-offset:2px}
+label{display:block;font-weight:600;font-size:15px;margin:14px 0 6px}
+input[type=email],input[type=text],select{width:100%;padding:11px 12px;border-radius:10px;border:1.5px solid var(--linha);background:var(--superficie)}
+.item{background:var(--superficie);border-radius:14px;padding:18px 18px 16px;margin:0 0 16px;border-left:5px solid var(--linha)}
+.item.duplicata{border-left-color:var(--ambar)}
+.item.saindo{opacity:0;transform:translateX(24px);transition:opacity .25s,transform .25s}
+.cabeca{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.descritor{font:500 15px/1.35 var(--maquina);word-break:break-word;margin:0}
+.valor{font:700 26px/1 var(--display);white-space:nowrap;font-variant-numeric:tabular-nums}
+.meta{color:var(--tinta-2);font-size:14px;margin:6px 0 0}
+.pergunta{margin:14px 0 0;padding:10px 12px;border-radius:10px;background:var(--musgo-claro);font-size:15px}
+.duplicata .pergunta{background:var(--ambar-claro)}
+.lembrar{display:flex;gap:10px;align-items:flex-start;font-weight:400;font-size:15px}
+.lembrar input{margin-top:4px;width:18px;height:18px;accent-color:var(--musgo)}
+.dica{color:var(--tinta-2);font-size:13px;margin:2px 0 0 28px}
+.acoes{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.aviso{padding:12px 14px;border-radius:10px;background:var(--superficie);border-left:5px solid var(--erro);margin:0 0 16px}
+.vazio{padding:40px 0;text-align:left}
+.vazio p{color:var(--tinta-2)}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){.item.saindo{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <section id="tela-login" hidden>
+    <h1>Entrar</h1>
+    <p class="sub">Receba um link de acesso no seu e-mail. Sem senha.</p>
+    <form id="form-login">
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="email" required>
+      <div class="acoes"><button class="botao" type="submit">Enviar link de acesso</button></div>
+    </form>
+    <p id="login-msg" class="meta" role="status"></p>
+  </section>
+
+  <section id="tela-fila" hidden>
+    <div class="topo"><span id="quem"></span><button class="link" id="sair" type="button">Sair</button></div>
+    <h1 id="contador">…</h1>
+    <p class="sub" id="contador-sub">Carregando a fila.</p>
+    <div id="aviso" class="aviso" role="alert" hidden></div>
+    <div id="lista"></div>
+  </section>
+</main>
+
+<script>
+const SUPABASE_URL = "https://xttnjrroofvstfnkcxzp.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Xyg1pW4h0LwjgUfcifnTdA_LE0eTGLO"; // chave pública; os dados são protegidos por login + RLS
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = id => document.getElementById(id);
+const brl = new Intl.NumberFormat("pt-BR", {style:"currency", currency:"BRL"});
+const dataBR = s => s ? s.slice(0,10).split("-").reverse().join("/") : "";
+
+function el(tag, props = {}, ...filhos){
+  const n = document.createElement(tag);
+  for (const [k,v] of Object.entries(props)){
+    if (k === "class") n.className = v;
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const f of filhos.flat()) if (f != null) n.append(f.nodeType ? f : document.createTextNode(f));
+  return n;
+}
+
+let categorias = [];
+
+async function iniciar(){
+  const { data:{ session } } = await db.auth.getSession();
+  mostrar(session);
+  db.auth.onAuthStateChange((_e, s) => mostrar(s));
+}
+
+function mostrar(session){
+  $("tela-login").hidden = !!session;
+  $("tela-fila").hidden = !session;
+  if (session){ $("quem").textContent = session.user.email; carregar(); }
+}
+
+$("form-login").addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = $("email").value.trim();
+  const btn = e.submitter; btn.disabled = true;
+  const { error } = await db.auth.signInWithOtp({
+    email,
+    options:{ shouldCreateUser:false, emailRedirectTo: location.origin + location.pathname }
+  });
+  btn.disabled = false;
+  $("login-msg").textContent = error
+    ? "Este e-mail não tem acesso, ou o envio falhou. Confira o endereço e tente de novo em alguns minutos."
+    : `Link enviado para ${email}. Abra o e-mail neste mesmo aparelho.`;
+});
+
+$("sair").addEventListener("click", () => db.auth.signOut());
+
+function avisar(msg){ const a = $("aviso"); a.textContent = msg || ""; a.hidden = !msg; }
+
+async function carregar(){
+  avisar("");
+  if (!categorias.length){
+    const { data, error } = await db.from("v_categorias_despesa").select("*").order("ordem_cat").order("ordem_sub");
+    if (error) return avisar("Não foi possível carregar as categorias: " + error.message);
+    categorias = data;
+  }
+  const { data, error } = await db.from("v_fila_revisao").select("*").order("valor", { ascending:false });
+  if (error) return avisar("Não foi possível carregar a fila: " + error.message);
+  if (!categorias.length && !data.length) avisar("Seu login entrou, mas ainda não está vinculado a um cadastro. Fale com o Vitor.");
+  renderizar(data);
+}
+
+function contador(n){
+  $("contador").textContent = n ? `Faltam ${n}` : "Fila vazia";
+  $("contador-sub").textContent = n
+    ? (n === 1 ? "Um lançamento precisa da sua resposta." : "Lançamentos que precisam da sua resposta. O mais caro primeiro.")
+    : "Tudo classificado. Quando a próxima fatura chegar, os novos itens aparecem aqui.";
+}
+
+function seletor(sugestao){
+  const s = el("select", { required:true });
+  s.append(el("option", { value:"" }, "Escolha a categoria"));
+  let grupo = null, atual = null;
+  for (const c of categorias){
+    if (c.categoria !== atual){ atual = c.categoria; grupo = el("optgroup", { label:c.categoria }); s.append(grupo); }
+    grupo.append(el("option", { value:c.id, selected: c.id === sugestao }, c.subcategoria));
+  }
+  return s;
+}
+
+function renderizar(itens){
+  const lista = $("lista"); lista.replaceChildren();
+  contador(itens.length);
+  itens.forEach((it, i) => lista.append(cartao(it, i)));
+}
+
+function cartao(it, i){
+  const dup = it.motivo === "possivel_duplicata";
+  const parcela = it.parcela_de ? ` · parcela ${it.parcela_num} de ${it.parcela_de}, total ${brl.format(it.valor_total)}` : "";
+  const meta = `${dataBR(it.data_compra)} · cartão final ${it.final_cartao}${parcela}`;
+  const cab = el("div", { class:"cabeca" },
+    el("div", {},
+      el("p", { class:"descritor" }, it.descricao_original),
+      it.nome_exibicao ? el("p", { class:"meta" }, it.nome_exibicao) : null),
+    el("div", { class:"valor" }, brl.format(it.valor)));
+  const card = el("article", { class:"item" + (dup ? " duplicata" : "") }, cab, el("p", { class:"meta" }, meta));
+  card.dataset.id = it.revisao_id;
+
+  if (dup){
+    const manter = el("button", { class:"botao secundario", type:"button" }, "São duas compras");
+    const remover = el("button", { class:"botao perigo", type:"button" }, "Foi cobrança repetida, remover");
+    manter.onclick = () => resolver(card, [manter, remover], { p_acao:"manter" });
+    remover.onclick = () => resolver(card, [manter, remover], { p_acao:"remover_duplicata" });
+    card.append(el("p", { class:"pergunta" }, "Outro lançamento tem o mesmo valor, data e estabelecimento. São duas compras de verdade ou o banco cobrou duas vezes?"),
+                el("div", { class:"acoes" }, manter, remover));
+    return card;
+  }
+
+  const idSel = "cat-" + i, idNome = "nome-" + i, idLem = "lem-" + i;
+  const sel = seletor(it.sugestao_categoria_id); sel.id = idSel;
+  const nome = el("input", { type:"text", id:idNome, placeholder:"Ex.: loja de facas, curso de inglês", value: it.nome_exibicao || "" });
+  const lembrar = el("input", { type:"checkbox", id:idLem, checked:true });
+  const salvar = el("button", { class:"botao", type:"button" }, "Salvar");
+  salvar.onclick = () => {
+    if (!sel.value){ sel.focus(); return; }
+    resolver(card, [salvar], { p_acao:"categorizar", p_categoria:Number(sel.value), p_lembrar:lembrar.checked, p_nome:nome.value.trim() || null });
+  };
+  const perg = it.sugestao_categoria_id
+    ? `Minha sugestão: ${it.sugestao_cat} › ${it.sugestao_sub}. Está certo?`
+    : "Não consegui descobrir o que é. O que foi essa compra?";
+  card.append(
+    el("p", { class:"pergunta" }, perg),
+    el("label", { for:idSel }, "Categoria"), sel,
+    el("label", { for:idNome }, "O que é (opcional)"), nome,
+    el("label", { class:"lembrar", for:idLem }, lembrar, "Usar esta categoria nas próximas compras deste estabelecimento"),
+    el("p", { class:"dica" }, "Desmarque para lojas que vendem de tudo, como Mercado Livre e Amazon."),
+    el("div", { class:"acoes" }, salvar));
+  return card;
+}
+
+async function resolver(card, botoes, args){
+  botoes.forEach(b => b.disabled = true);
+  const { error } = await db.rpc("resolver_revisao", { p_revisao: card.dataset.id, ...args });
+  if (error){ botoes.forEach(b => b.disabled = false); return avisar("Não salvou: " + error.message); }
+  card.classList.add("saindo");
+  setTimeout(carregar, 260);   // recarrega: uma resposta pode resolver outros itens do mesmo estabelecimento
+}
+
+iniciar();
+</script>
+</body>
+</html>
