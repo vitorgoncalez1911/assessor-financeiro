@@ -142,7 +142,7 @@ details.sub>summary{padding:8px 0;border-top:1px solid var(--linha);font-size:15
         <label for="imp-conta">Cartão</label>
         <select id="imp-conta"></select>
         <label for="imp-arquivo">Fatura em CSV ou ZIP</label>
-        <input id="imp-arquivo" type="file" accept=".csv,.zip,text/csv,application/zip">
+        <input id="imp-arquivo" type="file" accept=".csv,.zip,.pdf,text/csv,application/zip,application/pdf">
         <div id="imp-zip" hidden>
           <label for="imp-senha">Senha do ZIP</label>
           <input id="imp-senha" type="password" autocomplete="off">
@@ -192,9 +192,32 @@ function lerC6(texto){
   });
 }
 
+function lerPortador(texto){   // formato "Data;Estabelecimento;Portador;Valor;Parcela"
+  const linhas = texto.replace(/^\uFEFF/, "").split(/\r?\n/).filter(l => l.trim());
+  const cab = dividirCSV(linhas.shift(), ";").map(s => s.trim().toLowerCase());
+  const iData = cab.indexOf("data"), iDesc = cab.indexOf("estabelecimento"), iVal = cab.indexOf("valor"), iParc = cab.indexOf("parcela");
+  if ([iData,iDesc,iVal].some(i => i < 0)) throw new Error("Formato de fatura não reconhecido.");
+  const num = s => { s = (s||"").replace(/R\$/g,"").replace(/\s/g,""); if (s.includes(",")) s = s.replace(/\./g,"").replace(",","."); return Number(s); };
+  return linhas.map((l, n) => {
+    const c = dividirCSV(l, ";");
+    const [d,m,a] = c[iData].trim().split("/");
+    const mm = (c[iParc] || "").match(/(\d+)\s+de\s+(\d+)/);
+    const valor = num(c[iVal]);
+    if (!a || isNaN(valor)) throw new Error(`Linha ${n+2} ilegível.`);
+    return { data:`${a}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`, descricao:c[iDesc].replace(/\s+/g," ").trim(), final:"",
+             parcela_num: mm ? +mm[1] : 1, parcela_de: mm ? +mm[2] : 1, valor, valor_usd:0, cotacao:0 };
+  });
+}
+function escolherLeitor(texto){
+  const cab = texto.replace(/^\uFEFF/, "").split(/\r?\n/)[0].toLowerCase();
+  if (cab.includes("data de compra") && cab.includes("final do cart")) return lerC6;
+  if (cab.includes("estabelecimento") && cab.includes("portador")) return lerPortador;
+  return null;
+}
+
 const SUPABASE_URL = "https://xttnjrroofvstfnkcxzp.supabase.co";
 const SUPABASE_KEY = "sb_publishable_Xyg1pW4h0LwjgUfcifnTdA_LE0eTGLO"; // chave pública; os dados são protegidos por login + RLS
-const LEITORES = { "C6 Bank": lerC6 };   // um leitor por banco
+// o leitor é escolhido pelo formato do arquivo
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
@@ -372,7 +395,7 @@ function cartao(it, i){
     el("div", { class:"cabeca" },
       el("div", {}, el("p", { class:"descritor" }, it.descricao_original), it.nome_exibicao ? el("p", { class:"meta" }, it.nome_exibicao) : null),
       el("div", { class:"valor-grande" }, brl.format(it.valor))),
-    el("p", { class:"meta" }, `${dataBR(it.data_compra)} · cartão final ${it.final_cartao}${parcela}`));
+    el("p", { class:"meta" }, `${dataBR(it.data_compra)}${it.final_cartao ? ` · cartão final ${it.final_cartao}` : ""}${parcela}`));
   card.dataset.id = it.revisao_id;
   if (dup){
     const manter = el("button", { class:"botao secundario", type:"button" }, "São duas compras");
@@ -420,6 +443,7 @@ $("imp-arquivo").addEventListener("change", async e => {
   limparImport(); avisar("");
   arquivoAtual = e.target.files[0]; if (!arquivoAtual) return;
   const venc = vencimentoDoNome(arquivoAtual.name); if (venc) $("imp-venc").value = venc;
+  if (/\.pdf$/i.test(arquivoAtual.name)) return avisar("Faturas em PDF (como a do Itaú) ainda são importadas pelo chat. Se o banco oferecer CSV, a página passa a ler sozinha.");
   const zipado = /\.zip$/i.test(arquivoAtual.name);
   $("imp-zip").hidden = !zipado;
   if (zipado){ $("imp-senha").value = ""; $("imp-senha").focus(); }
@@ -443,16 +467,15 @@ $("imp-abrir").addEventListener("click", async () => {
   }
 });
 function prever(texto){
-  const conta = contas.find(c => c.id === $("imp-conta").value);
-  const leitor = conta && LEITORES[conta.instituicao];
-  if (!leitor) return avisar(`Ainda não sei ler faturas do ${conta ? conta.instituicao : "banco selecionado"}. Mande um CSV desse banco no chat para o Claude criar o leitor.`);
+  const leitor = escolherLeitor(texto);
+  if (!leitor) return avisar("Ainda não sei ler esse formato de fatura. Mande o arquivo no chat para o Claude criar o leitor.");
   try { linhasAtuais = leitor(texto); } catch (err){ linhasAtuais = null; return avisar(err.message); }
   const pagamentos = linhasAtuais.filter(l => l.valor < 0 && /pagamento/i.test(l.descricao));
   const total = linhasAtuais.filter(l => !pagamentos.includes(l)).reduce((a, l) => a + l.valor, 0);
   const cartoes = [...new Set(linhasAtuais.map(l => l.final))].join(" e ");
   $("imp-previa").replaceChildren(
     el("strong", {}, `${linhasAtuais.length} lançamentos, ${brl.format(total)}`),
-    el("p", { class:"meta" }, `Cartão final ${cartoes}. ${pagamentos.length ? "O pagamento da fatura anterior é separado automaticamente." : ""}`));
+    el("p", { class:"meta" }, `${cartoes ? `Cartão final ${cartoes}. ` : ""}${pagamentos.length ? "O pagamento da fatura anterior é separado automaticamente." : ""}`));
   $("imp-previa").hidden = false;
   $("imp-ir").disabled = false;
 }
