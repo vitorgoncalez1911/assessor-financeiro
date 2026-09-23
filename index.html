@@ -357,6 +357,26 @@ details.sub>summary .linha-cat .valor{font-weight:500}
           <div class="acoes"><button class="botao" id="imp-ir" type="button" disabled>Importar fatura</button></div>
           <div id="imp-resultado" class="resultado" role="status" hidden></div>
         </div>
+
+        <h2 style="margin-top:28px">Cartões cadastrados</h2>
+        <p class="sub">Cada cartão precisa existir aqui para a fatura poder ser importada. O dono define quem aparece como V ou G nos lançamentos.</p>
+        <div class="card" style="max-width:640px" id="cartoes-lista"></div>
+
+        <h2 style="margin-top:28px">Cadastrar novo cartão</h2>
+        <div class="card" style="max-width:640px">
+          <div class="linha-form">
+            <div><label for="nc-apelido">Apelido</label><input id="nc-apelido" type="text" placeholder="Ex.: Itaú Azul Giovanna"></div>
+            <div><label for="nc-banco">Banco</label><input id="nc-banco" type="text" placeholder="Ex.: Itaú, C6 Bank, Nubank"></div>
+          </div>
+          <div class="linha-form">
+            <div><label for="nc-venc">Dia do vencimento</label><input id="nc-venc" type="text" inputmode="numeric" placeholder="17"></div>
+            <div><label id="nc-quem-rot">Titular</label><div class="segmentos" role="group" aria-labelledby="nc-quem-rot" id="nc-quem"></div></div>
+          </div>
+          <label for="nc-finais">Finais dos cartões (separados por vírgula)</label>
+          <input id="nc-finais" type="text" inputmode="numeric" placeholder="4997, 3525, 3379">
+          <p class="dica">São os quatro últimos dígitos que aparecem na fatura. Pode deixar em branco se a fatura não mostrar.</p>
+          <div class="acoes"><button class="botao" id="nc-salvar" type="button">Cadastrar cartão</button></div>
+        </div>
       </section>
     </div>
   </main>
@@ -514,12 +534,13 @@ async function carregarTudo(){
   const paiRec = kr.data.find(x => x.parent_id == null && x.tipo_fluxo === "receita");
   categoriasRec = kr.data.filter(x => paiRec && x.parent_id === paiRec.id && x.ativa).sort((a, b) => a.ordem - b.ordem)
     .map(x => ({ id:x.id, categoria:"Receitas", subcategoria:x.nome }));
-  montarLancar();
+  montarLancar(); montarNovoCartao();
   $("imp-conta").replaceChildren(...contas.filter(x => x.tipo === "cartao").map(x => el("option", { value:x.id }, x.apelido)));
   montarFiltroPessoa();
   await carregarPeriodos();
   carregarFila();
   carregarLancados();
+  carregarCartoes();
 }
 
 function montarFiltroPessoa(){
@@ -1041,6 +1062,63 @@ async function carregarLancados(){
     return caixa;
   }) : [el("p", { class:"sub" }, "Nada lançado à mão ainda.")]));
 }
+
+/* ---------- Cartões ---------- */
+let ncQuem = null;
+async function carregarCartoes(){
+  const { data, error } = await db.from("v_cartoes").select("*").order("apelido");
+  if (error) return avisar("Não foi possível carregar os cartões: " + error.message);
+  const porConta = new Map();
+  for (const r of data){
+    if (!porConta.has(r.conta_id)) porConta.set(r.conta_id, { info:r, finais:[] });
+    if (r.final) porConta.get(r.conta_id).finais.push(r);
+  }
+  $("cartoes-lista").replaceChildren(...[...porConta.values()].map(({ info, finais }) => {
+    const bloco = el("div", { style:"padding:12px 0;border-top:1px solid var(--linha)" },
+      el("div", { class:"registro", style:"border:0;padding:0 0 6px" },
+        el("span", { class:`quem ${classePessoa(info.titular)}`, style:"cursor:default", "aria-hidden":"true" }, inicial(info.titular)),
+        el("div", { class:"desc" }, el("strong", {}, info.apelido),
+          el("span", {}, `${info.instituicao || "banco não informado"} · vence dia ${info.dia_vencimento || "?"} · titular ${info.titular || "?"}`))));
+    if (!finais.length) bloco.append(el("p", { class:"dica", style:"margin-left:36px" }, "Nenhum final cadastrado. Use o formulário abaixo para acrescentar."));
+    for (const f of finais){
+      const chips = el("div", { class:"segmentos" }, ...pessoas.map(p =>
+        el("button", { type:"button", "aria-pressed": String(f.pessoa_id === p.id), onclick: async () => {
+          const { error } = await db.rpc("definir_dono_cartao", { p_conta:f.conta_id, p_final:f.final, p_pessoa:p.id, p_aplicar_retroativo:true });
+          if (error) return avisar("Não salvou: " + error.message);
+          carregarCartoes(); carregarPainel($("painel-mes").value); carregarMes($("mes").value);
+        } }, p.nome)));
+      bloco.append(el("div", { style:"display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0 0 36px" },
+        el("span", { class:"cartao-tag", style:"font-size:14px;color:var(--texto)" }, ICONE_CARTAO(), `final ${f.final}`),
+        el("span", { class:"dica", style:"margin:0" }, `${f.lancamentos} lançamentos`), chips));
+    }
+    return bloco;
+  }));
+}
+function montarNovoCartao(){
+  ncQuem = ncQuem || (eu && eu.id);
+  $("nc-quem").replaceChildren(...pessoas.map(p =>
+    el("button", { type:"button", "aria-pressed": String(ncQuem === p.id), onclick:() => { ncQuem = p.id; montarNovoCartao(); } }, p.nome)));
+}
+$("nc-salvar").addEventListener("click", async () => {
+  avisar("");
+  const apelido = $("nc-apelido").value.trim(), banco = $("nc-banco").value.trim();
+  const venc = parseInt($("nc-venc").value, 10);
+  if (!apelido){ $("nc-apelido").focus(); return avisar("Dê um apelido ao cartão. Ex.: Itaú Azul Giovanna."); }
+  if (!(venc >= 1 && venc <= 31)){ $("nc-venc").focus(); return avisar("Informe o dia do vencimento, de 1 a 31."); }
+  $("nc-salvar").disabled = true;
+  const nova = await db.from("contas").insert({ apelido, tipo:"cartao", instituicao: banco || null, titular_id: ncQuem, dia_vencimento: venc }).select("id").single();
+  if (nova.error){ $("nc-salvar").disabled = false; return avisar(/duplicate|unique/i.test(nova.error.message) ? "Já existe um cartão com esse apelido." : "Não salvou: " + nova.error.message); }
+  for (const f of $("nc-finais").value.split(",").map(x => x.trim()).filter(Boolean)){
+    const r = await db.rpc("definir_dono_cartao", { p_conta:nova.data.id, p_final:f, p_pessoa:ncQuem, p_aplicar_retroativo:false });
+    if (r.error) avisar("Cartão criado, mas o final " + f + " falhou: " + r.error.message);
+  }
+  $("nc-salvar").disabled = false;
+  $("nc-apelido").value = ""; $("nc-banco").value = ""; $("nc-venc").value = ""; $("nc-finais").value = "";
+  const { data } = await db.from("contas").select("id,apelido,instituicao,tipo").eq("ativa", true).order("apelido");
+  contas = data || contas;
+  $("imp-conta").replaceChildren(...contas.filter(x => x.tipo === "cartao").map(x => el("option", { value:x.id }, x.apelido)));
+  carregarCartoes();
+});
 
 iniciar();
 </script>
