@@ -468,6 +468,21 @@ function el(tag, props = {}, ...filhos){
 }
 const ICONE_CARTAO = () => { const s = document.createElementNS("http://www.w3.org/2000/svg","svg"); s.setAttribute("viewBox","0 0 24 24"); s.setAttribute("fill","none"); s.setAttribute("stroke","currentColor"); s.setAttribute("stroke-width","1.8"); s.setAttribute("aria-hidden","true"); s.innerHTML = '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>'; return s; };
 function avisar(msg){ const a = $("aviso"); a.textContent = msg || ""; a.hidden = !msg; }
+let renovando = false;
+function sessaoExpirada(erro){
+  return erro && /permission denied|JWT|jwt expired|not authorized|invalid claim/i.test(erro.message || "");
+}
+async function tratarErro(erro, contexto){
+  if (!sessaoExpirada(erro)) { avisar(contexto + ": " + erro.message); return false; }
+  if (renovando) return true;
+  renovando = true;
+  const { data, error } = await db.auth.refreshSession();
+  renovando = false;
+  if (!error && data && data.session){ iniciado = false; mostrar(data.session); return true; }
+  await db.auth.signOut();
+  $("login-msg").textContent = "Sua sessão expirou. Informe o e-mail para receber um novo link de acesso.";
+  return true;
+}
 
 let pessoas = [], contas = [], categorias = [], categoriasRec = [], meses = [], filtroPessoa = "todos", iniciado = false, eu = null;
 const inicial = nome => nome ? nome.trim().charAt(0).toUpperCase() : "?";
@@ -527,7 +542,7 @@ async function carregarTudo(){
     db.from("categorias").select("id,nome,parent_id,tipo_fluxo,ordem,ativa")
   ]);
   const erro = p.error || c.error || k.error || kr.error;
-  if (erro) return avisar("Não foi possível carregar os dados: " + erro.message);
+  if (erro) return tratarErro(erro, "Não foi possível carregar os dados");
   pessoas = p.data.sort((a, b) => a.nome === "Vitor" ? -1 : b.nome === "Vitor" ? 1 : a.nome.localeCompare(b.nome));
   contas = c.data; categorias = k.data;
   eu = pessoas.find(x => session && x.user_id === session.user.id) || pessoas[0];
@@ -576,10 +591,10 @@ async function carregarMes(periodo){
   const ini = todos ? primeiro : periodo, fim = addMes(todos ? ultimo : periodo, 1);
   const q = db.from("v_lancamentos").select("*").eq("previsto", false).gte("data_caixa", ini).lt("data_caixa", fim).limit(10000);
   const qAnt = todos ? null : db.from("v_lancamentos").select("valor,tipo_fluxo,pessoa_id").eq("previsto", false).gte("data_caixa", addMes(periodo, -1)).lt("data_caixa", periodo).limit(10000);
-  const qFut = db.from("v_lancamentos").select("valor,data_caixa,pessoa_id").eq("previsto", true).gte("data_caixa", fim).order("data_caixa").limit(10000);
+  const qFut = db.from("v_lancamentos").select("valor,data_caixa,pessoa_id").eq("previsto", true).not("parcela_de", "is", null).gte("data_caixa", fim).order("data_caixa").limit(10000);
   const [atual, anterior, futuras] = await Promise.all([q, qAnt || Promise.resolve({ data:[] }), qFut]);
   const erro = atual.error || anterior.error || futuras.error;
-  if (erro) return avisar("Não foi possível carregar o período: " + erro.message);
+  if (erro) return tratarErro(erro, "Não foi possível carregar o período");
 
   const daPessoa = r => filtroPessoa === "todos" || r.pessoa_id === filtroPessoa;
   const soma = (rows, f = () => true) => rows.filter(f).reduce((a, r) => a + Number(r.valor), 0);
@@ -611,7 +626,7 @@ async function carregarMes(periodo){
     campos.push(["Taxa de poupança", rec ? `${Math.round((rec - total) / rec * 100)}%` : "—", rec ? "" : "precisa das receitas"]);
     campos.push(["Mês anterior", despAnt ? brl0.format(despAnt) : "—", variacao == null ? "sem dados" : `${variacao >= 0 ? "+" : "−"}${Math.abs(Math.round(variacao*100))}% neste mês`]);
   }
-  campos.push(["Já comprometido", brl0.format(comprometido), "parcelas futuras"]);
+  campos.push(["Já comprometido", brl0.format(comprometido), "parcelas de cartão a vencer"]);
   $("mes-campos").replaceChildren(...campos.map(([r, v, n]) => el("div", {}, el("div", { class:"rotulo" }, r), el("div", { class:"valor" }, v), n ? el("div", { class:"nota" }, n) : null)));
 
   renderizarCategorias(desp, total);
@@ -696,7 +711,7 @@ function itemLancamento(r){
 /* ---------- Revisão ---------- */
 async function carregarFila(){
   const { data, error } = await db.from("v_fila_revisao").select("*").order("valor", { ascending:false });
-  if (error) return avisar("Não foi possível carregar a fila: " + error.message);
+  if (error) return tratarErro(error, "Não foi possível carregar a fila");
   const b = $("badge"); b.textContent = data.length; b.hidden = !data.length;
   $("contador").textContent = data.length ? `Faltam ${data.length}` : "Fila vazia";
   $("rev-status").replaceChildren(data.length ? el("span", { class:"pilula atencao" }, "Pendente") : el("span", { class:"pilula ok" }, "Em dia"));
@@ -861,7 +876,7 @@ async function carregarPainel(mes){
     db.from("v_fila_revisao").select("revisao_id")
   ]);
   const erro = hist.error || prox.error || fila.error;
-  if (erro) return avisar("Não foi possível carregar o painel: " + erro.message);
+  if (erro) return tratarErro(erro, "Não foi possível carregar o painel");
 
   const doMes = tudo ? hist.data : hist.data.filter(r => r.data_caixa >= mes && r.data_caixa < fim);
   const nMeses = tudo ? meses.length : 1;
